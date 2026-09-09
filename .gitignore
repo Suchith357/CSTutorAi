@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment variables / secrets
+.env
+.env.*
+!.env.example
+
+# IDE
+.vscode/
+.idea/
+
+# Python tooling
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Local data
+data/raw/*
+data/processed/*
+data/metadata/*
+
+# Local models
+models/
+*.gguf
+*.safetensors
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
