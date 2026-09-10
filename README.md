@@ -34,7 +34,21 @@ The system combines a Large Language Model (LLM) with Retrieval-Augmented Genera
 
 ## Project Status
 
-🚧 Initial project setup
+✅ **RAG Retrieval Foundation — Complete**
+
+The retrieval subsystem is now reliable, tested, and end-to-end verified:
+
+- Ingestion pipeline: documents → chunks → embeddings → persistent FAISS index
+- Metadata-preserving retrieval with source attribution
+- FastAPI `/query` endpoint returning source-grounded knowledge chunks
+- 25 passing tests (pytest)
+- Configuration via environment variables
+
+See [PROJECT_STATUS.md](PROJECT_STATUS.md) for full details.
+
+### Next: LLM Integration
+
+The next phase will add LLM-powered grounded response generation, tutoring behavior, and personalized learning.
 
 ## Research Focus
 

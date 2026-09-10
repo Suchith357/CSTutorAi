@@ -1,0 +1,19 @@
+# CSTutorAI pinned dependencies (Python 3.12)
+# Versions pinned to the audited working environment.
+# For a full transitive lockfile, run: pip freeze > requirements.lock
+
+# --- Web / API ---
+fastapi==0.141.1
+uvicorn==0.52.4
+pydantic==2.13.5
+pydantic-settings==2.15.0
+
+# --- RAG: loading, chunking, embedding, vector search ---
+llama-index-core==0.14.24
+sentence-transformers==6.0.1
+faiss-cpu==1.15.0
+numpy==2.5.3
+
+# --- Testing ---
+pytest==8.4.2
+httpx==0.28.1
