@@ -66,22 +66,30 @@ def ingested_index(tmp_index_dir) -> str:
 
 
 @pytest.fixture
-def client(ingested_index):
-    """TestClient with lifespan run after ingesting the toy corpus."""
+def client(ingested_index, monkeypatch):
+    """TestClient with lifespan run after ingesting the toy corpus.
+
+    The mock LLM provider is forced so /query never downloads a real model
+    during the test suite (the real model is exercised by scripts/demo_query.py).
+    """
     from fastapi.testclient import TestClient
 
-    from backend.app.main import app
+    from backend.app import main
+    from backend.app.core import config
 
-    with TestClient(app) as test_client:
+    monkeypatch.setattr(config.settings, "llm_provider", "mock")
+    with TestClient(main.app) as test_client:
         yield test_client
 
 
 @pytest.fixture
-def client_no_index(tmp_index_dir):
+def client_no_index(tmp_index_dir, monkeypatch):
     """TestClient with lifespan run with no index present (retriever must stay unloaded)."""
     from fastapi.testclient import TestClient
 
-    from backend.app.main import app
+    from backend.app import main
+    from backend.app.core import config
 
-    with TestClient(app) as test_client:
+    monkeypatch.setattr(config.settings, "llm_provider", "mock")
+    with TestClient(main.app) as test_client:
         yield test_client

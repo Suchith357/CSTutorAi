@@ -20,6 +20,12 @@ class Settings(BaseSettings):
     raw_data_dir: str = "data/raw"
     index_dir: str = "data/index"
 
+    # --- LLM configuration (local-first, free) ---
+    # provider: "transformers" (local HF model) or "mock" (offline tests)
+    llm_provider: str = "transformers"
+    llm_model_name: str = "Qwen/Qwen2.5-0.5B-Instruct"
+    llm_max_new_tokens: int = 256
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",

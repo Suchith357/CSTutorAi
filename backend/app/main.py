@@ -4,6 +4,8 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, field_validator
 
 from backend.app.core.config import settings
+from backend.app.llm.client import LLMClient, create_llm_client
+from backend.app.llm.prompts import build_grounded_prompt
 from backend.app.rag.retriever import Retriever
 from backend.app.rag.schemas import RetrievedChunk
 
@@ -12,6 +14,7 @@ class AppState:
     """Holds process-wide services built at startup."""
 
     retriever: Retriever | None = None
+    llm: LLMClient | None = None
 
 
 state = AppState()
@@ -19,7 +22,7 @@ state = AppState()
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    """Load the persisted knowledge index at startup; serve retrieval from memory."""
+    """Load the persisted knowledge index and the LLM client at startup."""
     try:
         state.retriever = Retriever.from_prebuilt()
         print(
@@ -29,6 +32,9 @@ async def lifespan(_app: FastAPI):
     except FileNotFoundError as exc:
         print(f"Knowledge index not available: {exc}")
         state.retriever = None
+
+    state.llm = create_llm_client()  # model loads lazily on first query
+    print(f"LLM provider: {settings.llm_provider} (model: {settings.llm_model_name})")
     yield
 
 
@@ -54,6 +60,7 @@ class QueryRequest(BaseModel):
 
 class QueryResponse(BaseModel):
     question: str
+    answer: str
     retrieved: list[RetrievedChunk]
 
 
@@ -78,10 +85,7 @@ def health_check():
 @app.post("/query")
 def query(request: QueryRequest) -> QueryResponse:
     """
-    Retrieve source-grounded knowledge for a student's question.
-
-    Grounded answer generation (LLM layer) is intentionally not integrated yet;
-    this endpoint proves question -> retrieval -> cited source chunks.
+    Grounded tutoring: question -> retrieval -> prompt -> LLM -> answer + sources.
     """
     if state.retriever is None:
         raise HTTPException(
@@ -91,6 +95,14 @@ def query(request: QueryRequest) -> QueryResponse:
                 "python -m backend.app.rag.ingestion"
             ),
         )
+    if state.llm is None:
+        raise HTTPException(status_code=503, detail="LLM client is not initialized")
 
     retrieved = state.retriever.retrieve(request.question)
-    return QueryResponse(question=request.question, retrieved=retrieved)
+    system, user = build_grounded_prompt(request.question, retrieved)
+    answer = state.llm.generate(system, user)
+    return QueryResponse(
+        question=request.question,
+        answer=answer,
+        retrieved=retrieved,
+    )
