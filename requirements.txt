@@ -1,4 +1,4 @@
-# CSTutorAI pinned dependencies (Python 3.12)
+# OSTutorAI pinned dependencies (Python 3.12)
 # Versions pinned to the audited working environment.
 # For a full transitive lockfile, run: pip freeze > requirements.lock
 

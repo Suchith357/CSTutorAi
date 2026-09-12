@@ -16,6 +16,7 @@ Artifacts written to the index directory:
 
 import argparse
 import json
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -32,8 +33,47 @@ METADATA_FILE = "metadata.jsonl"
 MANIFEST_FILE = "manifest.json"
 
 
-def derive_metadata(document: Document) -> DocumentMetadata:
-    """Derive provenance metadata for a loaded document."""
+FRONT_MATTER_LINE = re.compile(r"^([A-Za-z_][\w-]*)\s*:\s*(.+?)\s*$")
+
+
+def parse_front_matter(text: str) -> tuple[dict[str, str], str]:
+    """Parse simple '--- key: value ---' front matter from a document.
+
+    Supports plain one-line values (quoted or unquoted) - no external YAML
+    dependency. Returns (metadata dict, cleaned text without the block).
+    """
+    stripped = text.lstrip()
+    lines = stripped.splitlines()
+    if not lines or lines[0].strip() != "---":
+        return {}, text
+
+    meta: dict[str, str] = {}
+    end_idx = None
+    for i, line in enumerate(lines[1:], start=1):
+        if line.strip() in ("---", "..."):
+            end_idx = i
+            break
+        match = FRONT_MATTER_LINE.match(line)
+        if match:
+            value = match.group(2).strip().strip('"').strip("'")
+            meta[match.group(1).lower()] = value
+    if end_idx is None:
+        return {}, text  # unterminated block: treat as content, not metadata
+
+    cleaned = "\n".join(lines[end_idx + 1:]).lstrip("\n")
+    return meta, cleaned
+
+
+def derive_metadata(
+    document: Document,
+    front_matter: dict[str, str] | None = None,
+) -> DocumentMetadata:
+    """Derive provenance metadata for a loaded document.
+
+    Front matter (parsed from the document text) takes precedence over
+    LlamaIndex file metadata; filename-derived values are the last resort.
+    """
+    front = front_matter or {}
     file_path = (
         document.metadata.get("file_path")
         or document.metadata.get("file_name")
@@ -49,11 +89,11 @@ def derive_metadata(document: Document) -> DocumentMetadata:
         page = None
 
     return DocumentMetadata(
-        title=document.metadata.get("title") or display_name,
-        source=document.metadata.get("source") or Path(file_path).name,
-        topic=document.metadata.get("topic") or display_name,
-        url=document.metadata.get("url"),
-        license=document.metadata.get("license"),
+        title=front.get("title") or document.metadata.get("title") or display_name,
+        source=front.get("source") or document.metadata.get("source") or Path(file_path).name,
+        topic=front.get("topic") or document.metadata.get("topic") or display_name,
+        url=front.get("url") or document.metadata.get("url"),
+        license=front.get("license") or document.metadata.get("license"),
         page=page,
         created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
     )
@@ -64,13 +104,21 @@ def document_to_chunks(
     chunk_size: int,
     chunk_overlap: int,
 ) -> list[DocumentChunk]:
-    """Split a loaded document into chunks and attach derived metadata."""
+    """Split a loaded document into chunks and attach derived metadata.
+
+    Front matter is stripped from the text before chunking so it is embedded
+    only as metadata, never as searchable content.
+    """
+    front, cleaned_text = parse_front_matter(document.text)
+    if front:
+        document = Document(text=cleaned_text, metadata=document.metadata)
+
     nodes = chunk_documents(
         [document],
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
     )
-    base_metadata = derive_metadata(document)
+    base_metadata = derive_metadata(document, front)
 
     chunks: list[DocumentChunk] = []
     for node in nodes:
@@ -204,7 +252,7 @@ def ingest(
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Build the CSTutorAI knowledge index from documents in data/raw."
+        description="Build the OSTutorAI knowledge index from documents in data/raw."
     )
     parser.add_argument("--raw-dir", default=None, help="Defaults to RAW_DATA_DIR from settings")
     parser.add_argument("--index-dir", default=None, help="Defaults to INDEX_DIR from settings")

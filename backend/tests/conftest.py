@@ -6,7 +6,20 @@ import pytest
 from backend.app.rag.schemas import DocumentChunk, DocumentMetadata
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
-TOY_CORPUS = REPO_ROOT / "data" / "raw" / "toy_corpus.md"
+TOY_CORPUS = REPO_ROOT / "data" / "raw" / "fixtures" / "toy_corpus.md"
+KB_DIR = REPO_ROOT / "data" / "raw"  # the real OSTutorAI knowledge base
+
+def _make_chunk(text: str, i: int) -> DocumentChunk:
+    """Helper: a DocumentChunk with toy provenance metadata."""
+    return DocumentChunk(
+        text=text,
+        metadata=DocumentMetadata(
+            title=f"Toy Chunk {i}",
+            source="toy_corpus.md",
+            topic="toy",
+        ),
+    )
+
 
 TOY_CHUNK_TEXTS = [
     "A process is a program in execution. A process has its own state and resources.",
@@ -21,15 +34,36 @@ TOY_CHUNK_TEXTS = [
 def toy_chunks() -> list[DocumentChunk]:
     """Five chunks with distinct provenance metadata (clearly labeled toy data)."""
     return [
-        DocumentChunk(
-            text=text,
-            metadata=DocumentMetadata(
-                title=f"Toy Chunk {i}",
-                source="toy_corpus.md",
-                topic="toy",
-            ),
-        )
+        _make_chunk(text, i)
         for i, text in enumerate(TOY_CHUNK_TEXTS, start=1)
+    ]
+
+
+@pytest.fixture
+def strong_retrieval(toy_chunks):
+    """RetrievedChunk list with a clearly above-threshold top score."""
+    from backend.app.rag.schemas import RetrievedChunk
+
+    return [
+        RetrievedChunk(
+            text=toy_chunks[0].text,
+            score=0.69,
+            metadata=toy_chunks[0].metadata,
+        )
+    ]
+
+
+@pytest.fixture
+def weak_retrieval(toy_chunks):
+    """RetrievedChunk list whose best score is below any sensible threshold."""
+    from backend.app.rag.schemas import RetrievedChunk
+
+    return [
+        RetrievedChunk(
+            text=toy_chunks[4].text,
+            score=0.287,
+            metadata=toy_chunks[4].metadata,
+        )
     ]
 
 

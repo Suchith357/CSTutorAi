@@ -1,0 +1,342 @@
+{
+  "schema_version": 2,
+  "description": "OSTutorAI retrieval evaluation dataset. Labels the retrieval/grounding decision boundary against the CURRENT project-authored OS knowledge base (data/raw/*.md, 15 topic documents, ingested 2026-09-11). corpus_support labels were re-validated against that knowledge base on 2026-09-11 (schema_version 1 was relative to the old toy corpus).",
+  "label_history": [
+    {
+      "schema_version": 1,
+      "corpus": "data/raw/toy_corpus.md (fixture; now at data/raw/fixtures/)",
+      "distribution": "18 relevant (9 covered), 7 borderline, 10 irrelevant"
+    },
+    {
+      "schema_version": 2,
+      "corpus": "15 project-authored OS topic documents in data/raw/",
+      "distribution": "25 relevant (25 covered), 0 borderline, 10 irrelevant",
+      "note": "The 15-document OS knowledge base covers every topic the relevant questions probe, so all borderline/partial and relevant/absent labels became covered. expected_relevance labels are UNCHANGED; only corpus_support and expected_source were re-derived from the actual corpus contents."
+    }
+  ],
+  "label_definitions": {
+    "expected_relevance": {
+      "relevant": "A genuine Operating Systems question that OSTutorAI should be able to answer when the knowledge base covers the topic. Does NOT imply the current corpus covers it (see corpus_support).",
+      "borderline": "Question whose retrieval outcome is genuinely uncertain against this corpus (partial thematic overlap only). Excluded from precision/recall; reported separately.",
+      "irrelevant": "Clearly outside the Operating Systems tutoring scope (other domains, DSA, networking, career, trivia). Should always be rejected by the grounding gate."
+    },
+    "corpus_support": {
+      "covered": "A document in data/raw/ explicitly contains the information needed to answer the question. Only covered+relevant questions are ground-truth positives.",
+      "partial": "The corpus contains only thematically adjacent content; the question cannot be reliably answered from it.",
+      "absent": "The corpus contains no supporting content for this question."
+    },
+    "confusion_matrix_rules": {
+      "positives": "expected_relevance == relevant AND corpus_support == covered",
+      "negatives": "expected_relevance == irrelevant",
+      "excluded": "borderline questions and relevant+absent questions (corpus coverage gaps) are reported separately and never counted in TP/FP/FN/TN"
+    },
+    "score_meaning": "Retrieval score is cosine similarity (normalized embeddings, FAISS inner product) in [-1, 1]. It is NOT a percentage or probability. Labels are corpus-relative and MUST be re-validated whenever the knowledge base changes."
+  },
+  "questions": [
+    {
+      "id": "os_fund_001",
+      "question": "In an operating system, what is a program in execution called?",
+      "topic": "os-fundamentals",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "processes.md",
+      "note": "Answered by the process definition ('A process is a program in execution') in processes.md; os_fundamentals.md adds the program-vs-process distinction."
+    },
+    {
+      "id": "os_proc_001",
+      "question": "What is a process in an operating system?",
+      "topic": "processes",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "processes.md",
+      "note": "processes.md contains the full definition, memory layout, states, PCB."
+    },
+    {
+      "id": "os_proc_002",
+      "question": "What does a process own while it is executing?",
+      "topic": "processes",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "processes.md",
+      "note": "processes.md: address space, registers, PC, stack, PCB bookkeeping."
+    },
+    {
+      "id": "os_proc_003",
+      "question": "How is a process related to a program?",
+      "topic": "processes",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "processes.md",
+      "note": "processes.md: 'A program is the passive executable file; one program can spawn many processes.'"
+    },
+    {
+      "id": "os_dead_001",
+      "question": "What is a deadlock in operating systems?",
+      "topic": "deadlocks",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "deadlocks.md",
+      "note": "deadlocks.md Definition section; scored 0.6915 under the toy corpus and 0.6408 under the new KB."
+    },
+    {
+      "id": "os_dead_002",
+      "question": "What happens when a group of processes each hold a resource and wait for resources held by the others?",
+      "topic": "deadlocks",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "deadlocks.md",
+      "note": "Long paraphrase of the deadlock definition; deadlocks.md covers it with an explicit two-process example."
+    },
+    {
+      "id": "os_dead_003",
+      "question": "Why might processes that wait on each other's resources never finish running?",
+      "topic": "deadlocks",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "deadlocks.md",
+      "note": "Paraphrase of permanent blocking; deadlocks.md explains none can proceed and none will release."
+    },
+    {
+      "id": "os_cpu_001",
+      "question": "How does the operating system decide which process gets the CPU next?",
+      "topic": "cpu-scheduling",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "cpu_scheduling.md",
+      "note": "cpu_scheduling.md defines scheduling as exactly this decision; under the toy corpus this scored 0.3422 (rejected); under the new KB the same intent scores 0.6069."
+    },
+    {
+      "id": "os_cpu_002",
+      "question": "What determines the order in which processes are allocated CPU time?",
+      "topic": "cpu-scheduling",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "cpu_scheduling.md",
+      "note": "Scheduling paraphrase; the previous FN at threshold 0.42 with the toy corpus. Re-scored against the new KB during recalibration."
+    },
+    {
+      "id": "os_thread_001",
+      "question": "What is a thread in an operating system?",
+      "topic": "threads",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "threads.md",
+      "note": "Coverage update (v1->v2): threads.md now contains the full thread definition and private/shared resource split. Was absent under the toy corpus."
+    },
+    {
+      "id": "os_thread_002",
+      "question": "How do threads differ from processes?",
+      "topic": "threads",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "threads.md",
+      "note": "Coverage update (v1->v2): threads.md has an explicit process-vs-thread comparison table."
+    },
+    {
+      "id": "os_sync_001",
+      "question": "What is a semaphore used for in operating systems?",
+      "topic": "synchronization",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "synchronization.md",
+      "note": "Coverage update (v1->v2): synchronization.md explains wait/signal, binary and counting semaphores, resource pools."
+    },
+    {
+      "id": "os_sync_002",
+      "question": "What is a critical section?",
+      "topic": "synchronization",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "synchronization.md",
+      "note": "Coverage update (v1->v2): synchronization.md defines critical sections and the three protocol requirements."
+    },
+    {
+      "id": "os_mem_001",
+      "question": "What is paging in operating systems?",
+      "topic": "memory-management",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "memory_management.md",
+      "note": "Coverage update (v1->v2): memory_management.md has a full Paging section (pages/frames, page tables, TLB)."
+    },
+    {
+      "id": "os_mem_002",
+      "question": "How does the operating system manage memory allocation for processes?",
+      "topic": "memory-management",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "memory_management.md",
+      "note": "Coverage update (v1->v2): memory_management.md covers contiguous allocation, fragmentation, paging, segmentation."
+    },
+    {
+      "id": "os_vm_001",
+      "question": "What is virtual memory?",
+      "topic": "virtual-memory",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "virtual_memory.md",
+      "note": "Coverage update (v1->v2): virtual_memory.md is entirely about virtual memory, demand paging, and replacement."
+    },
+    {
+      "id": "os_fs_001",
+      "question": "What is a file system in an operating system?",
+      "topic": "file-systems",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "file_systems.md",
+      "note": "Coverage update (v1->v2): file_systems.md covers files, attributes, directories, allocation, free space."
+    },
+    {
+      "id": "os_io_001",
+      "question": "How does an operating system handle input and output devices?",
+      "topic": "io",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "io_systems.md",
+      "note": "Coverage update (v1->v2): io_systems.md covers controllers, drivers, polling/interrupts/DMA, buffering, spooling."
+    },
+    {
+      "id": "os_dead_004",
+      "question": "What are the necessary conditions for deadlock?",
+      "topic": "deadlocks",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "deadlocks.md",
+      "note": "Coverage update (v1->v2, was borderline/partial): deadlocks.md explicitly lists the four Coffman conditions and their sufficiency status."
+    },
+    {
+      "id": "os_cpu_003",
+      "question": "What is round-robin CPU scheduling?",
+      "topic": "cpu-scheduling",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "cpu_scheduling.md",
+      "note": "Coverage update (v1->v2, was borderline/partial): cpu_scheduling.md has a Round Robin section (quantum, convoy/degeneration trade-offs)."
+    },
+    {
+      "id": "os_cpu_004",
+      "question": "What happens during a context switch?",
+      "topic": "cpu-scheduling",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "processes.md",
+      "note": "Coverage update (v1->v2, was borderline/partial): processes.md has a Context Switching section (what is saved, when it happens, its cost)."
+    },
+    {
+      "id": "os_thread_003",
+      "question": "Can threads within the same process share resources?",
+      "topic": "threads",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "threads.md",
+      "note": "Coverage update (v1->v2, was borderline/partial): threads.md lists exactly what threads share (code, data, heap, files) vs own (stack, registers)."
+    },
+    {
+      "id": "os_sync_003",
+      "question": "How can an operating system prevent processes from interfering with each other?",
+      "topic": "synchronization",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "synchronization.md",
+      "note": "Coverage update (v1->v2, was borderline/partial): synchronization.md covers mutual exclusion via Peterson, test-and-set, mutexes, semaphores, monitors; protection_security.md adds isolation."
+    },
+    {
+      "id": "os_mem_003",
+      "question": "Where do processes keep their state while they are running?",
+      "topic": "memory-management",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "processes.md",
+      "note": "Coverage update (v1->v2, was borderline/partial): processes.md Process Memory Layout section (text, data, BSS, heap, stack) and the PCB (register state)."
+    },
+    {
+      "id": "os_io_002",
+      "question": "Do processes need to wait for resources during input and output operations?",
+      "topic": "io",
+      "expected_relevance": "relevant",
+      "corpus_support": "covered",
+      "expected_source": "processes.md",
+      "note": "Coverage update (v1->v2, was borderline/partial): processes.md state model includes Running->Blocked (waits for I/O) and io_systems.md explains blocking vs interrupt-driven transfers."
+    },
+    {
+      "id": "non_os_001",
+      "question": "Explain photosynthesis in plants.",
+      "topic": "non-os",
+      "expected_relevance": "irrelevant",
+      "corpus_support": "absent",
+      "note": "Biology; far from corpus semantics. Should be rejected."
+    },
+    {
+      "id": "non_os_002",
+      "question": "What is a binary search tree used for?",
+      "topic": "non-os",
+      "expected_relevance": "irrelevant",
+      "corpus_support": "absent",
+      "note": "DSA topic, intentionally out of scope; strongest-scoring negative under the toy corpus (0.3232). Re-scored against the new KB during recalibration."
+    },
+    {
+      "id": "non_os_003",
+      "question": "Explain the difference between TCP and UDP.",
+      "topic": "non-os",
+      "expected_relevance": "irrelevant",
+      "corpus_support": "absent",
+      "note": "Networking is out of scope. Coverage update (v1->v2): support changed partial->absent because the new KB correctly contains no networking content (the old toy corpus had one TCP sentence)."
+    },
+    {
+      "id": "non_os_004",
+      "question": "What is gradient descent in machine learning?",
+      "topic": "non-os",
+      "expected_relevance": "irrelevant",
+      "corpus_support": "absent",
+      "note": "ML; should be rejected."
+    },
+    {
+      "id": "non_os_005",
+      "question": "What is a foreign key in a database?",
+      "topic": "non-os",
+      "expected_relevance": "irrelevant",
+      "corpus_support": "absent",
+      "note": "DBMS is out of scope. Coverage update (v1->v2): support changed partial->absent (the old toy corpus had one DBMS sentence)."
+    },
+    {
+      "id": "non_os_006",
+      "question": "How do I prepare for a technical interview?",
+      "topic": "non-os",
+      "expected_relevance": "irrelevant",
+      "corpus_support": "absent",
+      "note": "Career prep; explicitly out of project scope."
+    },
+    {
+      "id": "non_os_007",
+      "question": "What is the capital of France?",
+      "topic": "non-os",
+      "expected_relevance": "irrelevant",
+      "corpus_support": "absent",
+      "note": "General trivia."
+    },
+    {
+      "id": "non_os_008",
+      "question": "Explain the theory of relativity.",
+      "topic": "non-os",
+      "expected_relevance": "irrelevant",
+      "corpus_support": "absent",
+      "note": "Physics."
+    },
+    {
+      "id": "non_os_009",
+      "question": "What is a hash map?",
+      "topic": "non-os",
+      "expected_relevance": "irrelevant",
+      "corpus_support": "absent",
+      "note": "DSA; out of scope."
+    },
+    {
+      "id": "non_os_010",
+      "question": "Which laptop should I buy for gaming?",
+      "topic": "non-os",
+      "expected_relevance": "irrelevant",
+      "corpus_support": "absent",
+      "note": "Consumer advice."
+    }
+  ]
+}

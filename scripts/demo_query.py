@@ -18,19 +18,44 @@ def main():
     from backend.app.core.config import settings
     from backend.app.llm.client import create_llm_client
     from backend.app.llm.prompts import build_grounded_prompt
+    from backend.app.rag.grounding import (
+        INSUFFICIENT_CONTEXT_ANSWER,
+        InsufficientContextError,
+        evaluate_retrieval,
+    )
     from backend.app.rag.retriever import Retriever
 
     question = " ".join(sys.argv[1:]).strip() or "What is deadlock?"
 
     print("=" * 60)
-    print("CSTutorAI - full pipeline demo")
+    print("OSTutorAI - full grounded pipeline demo")
     print("=" * 60)
 
     retriever = Retriever.from_prebuilt(settings.index_path)
     retrieved = retriever.retrieve(question)
 
+    print("\nRetrieval scores (cosine similarity, not a percentage):")
+    for i, chunk in enumerate(retrieved, start=1):
+        print(f"  [{i}] score={chunk.score:.4f}  {chunk.metadata.title} "
+              f"(source: {chunk.metadata.source})")
+
+    # Grounding gate: identical decision logic to the /query endpoint.
+    try:
+        evaluate_retrieval(retrieved)
+    except InsufficientContextError as exc:
+        print(f"\nGrounding decision: NOT sufficient ({exc.reason})")
+        print("LLM was NOT called. Safe fallback response:\n")
+        print(INSUFFICIENT_CONTEXT_ANSWER)
+        return 0
+
+    print(f"\nGrounding decision: sufficient "
+          f"(min_score={settings.retrieval_min_score})")
     llm = create_llm_client()
-    system, user = build_grounded_prompt(question, retrieved)
+    system, user = build_grounded_prompt(
+        question,
+        retrieved,
+        retrieval_min_score=settings.retrieval_min_score,
+    )
     print("\nGenerating answer with local model "
           f"{settings.llm_model_name} (first run downloads ~1 GB)...")
 

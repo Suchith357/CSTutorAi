@@ -1,6 +1,6 @@
 """LLM client abstraction and the first local provider (HuggingFace transformers).
 
-CSTutorAI depends only on the LLMClient interface; the concrete provider is
+OSTutorAI depends only on the LLMClient interface; the concrete provider is
 selected through settings (llm_provider), so the model can be replaced later
 without touching application code.
 

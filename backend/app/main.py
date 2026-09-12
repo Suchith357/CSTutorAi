@@ -6,6 +6,11 @@ from pydantic import BaseModel, field_validator
 from backend.app.core.config import settings
 from backend.app.llm.client import LLMClient, create_llm_client
 from backend.app.llm.prompts import build_grounded_prompt
+from backend.app.rag.grounding import (
+    INSUFFICIENT_CONTEXT_ANSWER,
+    InsufficientContextError,
+    evaluate_retrieval,
+)
 from backend.app.rag.retriever import Retriever
 from backend.app.rag.schemas import RetrievedChunk
 
@@ -40,7 +45,9 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(
     title=settings.app_name,
-    description="An interactive, personalized and source-grounded Computer Science AI tutor.",
+    description=(
+        "An interactive, source-grounded AI tutor for Operating Systems education."
+    ),
     version=settings.app_version,
     lifespan=lifespan,
 )
@@ -62,6 +69,7 @@ class QueryResponse(BaseModel):
     question: str
     answer: str
     retrieved: list[RetrievedChunk]
+    grounded: bool
 
 
 @app.get("/")
@@ -82,10 +90,29 @@ def health_check():
     }
 
 
+def _answer_with_grounding(question: str, retrieved: list[RetrievedChunk]) -> str:
+    """Generate an answer from retrieval, or raise InsufficientContextError.
+
+    Kept out of the route body so the grounding decision can be unit tested
+    directly.
+    """
+    evaluate_retrieval(retrieved)
+    system, user = build_grounded_prompt(
+        question,
+        retrieved,
+        retrieval_min_score=settings.retrieval_min_score,
+    )
+    return state.llm.generate(system, user)
+
+
 @app.post("/query")
 def query(request: QueryRequest) -> QueryResponse:
     """
-    Grounded tutoring: question -> retrieval -> prompt -> LLM -> answer + sources.
+    Grounded tutoring: question -> retrieval -> relevance check -> LLM -> answer + sources.
+
+    When retrieval is empty or too weak (best score below
+    settings.retrieval_min_score), the LLM is NOT called and a safe
+    insufficient-context response is returned with grounded=False.
     """
     if state.retriever is None:
         raise HTTPException(
@@ -99,10 +126,20 @@ def query(request: QueryRequest) -> QueryResponse:
         raise HTTPException(status_code=503, detail="LLM client is not initialized")
 
     retrieved = state.retriever.retrieve(request.question)
-    system, user = build_grounded_prompt(request.question, retrieved)
-    answer = state.llm.generate(system, user)
+
+    try:
+        answer = _answer_with_grounding(request.question, retrieved)
+    except InsufficientContextError as exc:
+        return QueryResponse(
+            question=request.question,
+            answer=INSUFFICIENT_CONTEXT_ANSWER,
+            retrieved=exc.retrieved,
+            grounded=False,
+        )
+
     return QueryResponse(
         question=request.question,
         answer=answer,
         retrieved=retrieved,
+        grounded=True,
     )

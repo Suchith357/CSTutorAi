@@ -25,11 +25,13 @@ def mock_llm() -> MockLLMClient:
 
 class TestGroundedPrompt:
     def test_system_instruction_contains_grounding_rules(self):
-        assert "ONLY the retrieved sources" in SYSTEM_INSTRUCTION
+        assert "authoritative" in SYSTEM_INSTRUCTION
         assert "Never invent facts" in SYSTEM_INSTRUCTION
         assert "do not contain enough information" in SYSTEM_INSTRUCTION
-        assert "Teach, don't just answer" in SYSTEM_INSTRUCTION
+        assert "Teach, don't just" in SYSTEM_INSTRUCTION
         assert "cite it as [1], [2]" in SYSTEM_INSTRUCTION
+        # Grounding: retrieved material outranks model-pretrained knowledge
+        assert "Prefer the retrieved educational material" in SYSTEM_INSTRUCTION
 
     def test_format_context_numbers_sources(self, toy_chunks):
         context = format_context(toy_chunks[:2])
