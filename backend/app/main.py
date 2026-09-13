@@ -13,6 +13,18 @@ from backend.app.rag.grounding import (
 )
 from backend.app.rag.retriever import Retriever
 from backend.app.rag.schemas import RetrievedChunk
+from backend.app.tutoring.engine import TutorEngine, detect_topic
+from backend.app.tutoring.schemas import (
+    DIFFICULTY_BEGINNER,
+    AnswerEvaluation,
+    EvaluateAnswerRequest,
+    MasterySnapshot,
+    StudentProgressResponse,
+    TutorMode,
+    TutorRequest,
+    TutorResponse,
+)
+from backend.app.tutoring.student_model import STUDENT_REGISTRY
 
 
 class AppState:
@@ -20,6 +32,7 @@ class AppState:
 
     retriever: Retriever | None = None
     llm: LLMClient | None = None
+    tutor: TutorEngine | None = None
 
 
 state = AppState()
@@ -39,8 +52,13 @@ async def lifespan(_app: FastAPI):
         state.retriever = None
 
     state.llm = create_llm_client()  # model loads lazily on first query
+    state.tutor = TutorEngine(state.retriever, state.llm) if state.retriever else None
     print(f"LLM provider: {settings.llm_provider} (model: {settings.llm_model_name})")
     yield
+
+    # In-memory student models live for the process lifetime only (by design:
+    # no persistence layer in this milestone).
+    STUDENT_REGISTRY.reset()
 
 
 app = FastAPI(
@@ -142,4 +160,74 @@ def query(request: QueryRequest) -> QueryResponse:
         answer=answer,
         retrieved=retrieved,
         grounded=True,
+    )
+
+
+# ---------------------------------------------------------------------------
+# Tutor Engine endpoints (new; /health and /query above stay untouched)
+# ---------------------------------------------------------------------------
+
+
+def _require_tutor() -> TutorEngine:
+    if state.tutor is None:
+        raise HTTPException(
+            status_code=503,
+            detail=(
+                "Tutor Engine is not available: knowledge index is not loaded. "
+                "Build it first with: python -m backend.app.rag.ingestion"
+            ),
+        )
+    return state.tutor
+
+
+@app.post("/tutor", response_model=TutorResponse)
+def tutor(request: TutorRequest) -> TutorResponse:
+    """Grounded, mode-aware tutoring turn with adaptive difficulty.
+
+    The grounding gate runs BEFORE any LLM call: when retrieval is too weak,
+    a safe refusal is returned (grounded=False) and the model is never asked
+    to fabricate an answer. Difficulty adapts to the student's in-memory
+    mastery for the detected topic.
+    """
+    engine = _require_tutor()
+    student = STUDENT_REGISTRY.get_or_create(request.student_id)
+    return engine.tutor(request.question, request.mode, student)
+
+
+@app.post("/tutor/evaluate", response_model=AnswerEvaluation)
+def tutor_evaluate(request: EvaluateAnswerRequest) -> AnswerEvaluation:
+    """Evaluate a student's answer, update their mastery, return feedback.
+
+    Evaluation is rule-based first (deterministic); the LLM judge is only
+    consulted for ambiguous cases. The mastery delta recorded in the student
+    model matches the delta reported in the response.
+    """
+    engine = _require_tutor()
+    student = STUDENT_REGISTRY.get_or_create(request.student_id)
+    evaluation, _snapshot = engine.evaluate_and_update(
+        student,
+        topic=request.topic,
+        question=request.question,
+        student_answer=request.student_answer,
+        reference_points=request.reference_points,
+        hint_used=request.hint_used,
+    )
+    return evaluation
+
+
+@app.get("/tutor/progress/{student_id}", response_model=StudentProgressResponse)
+def tutor_progress(student_id: str) -> StudentProgressResponse:
+    """Return the in-memory learning state for one student.
+
+    Unknown students get an empty progress report (not an error), because a
+    fresh student legitimately has no history yet.
+    """
+    student = STUDENT_REGISTRY.get_or_create(student_id)
+    attempted, correct = student.totals()
+    topics = student.progress()
+    return StudentProgressResponse(
+        student_id=student_id,
+        topics=topics,
+        overall_attempts=attempted,
+        overall_correct=correct,
     )

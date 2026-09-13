@@ -39,10 +39,48 @@ class Settings(BaseSettings):
     auth_rate_limit_window_seconds: int = 300
     auth_rate_limit_cooldown_seconds: int = 600
 
+    # --- Tutor Engine / adaptive teaching ---
+    # Topic mastery update deltas (mastery stays clamped to [0, 1]).
+    tutor_mastery_gain_correct: float = 0.10
+    tutor_mastery_drop_incorrect: float = 0.05
+    tutor_mastery_gain_hint: float = 0.0  # hints are tracked, not scored
+    # Difficulty scale 1..5: 1 beginner, 2 basic, 3 intermediate,
+    # 4 advanced, 5 exam/viva. Mapping mastery -> difficulty thresholds:
+    # < 0.25 -> 1, < 0.45 -> 2, < 0.70 -> 3, < 0.90 -> 4, else 5.
+    tutor_difficulty_low_threshold: float = 0.25
+    tutor_difficulty_medium_threshold: float = 0.45
+    tutor_difficulty_high_threshold: float = 0.70
+    tutor_difficulty_exam_threshold: float = 0.90
+    # Student model per-student topic history cap (transparent in-memory model).
+    tutor_recent_performance_limit: int = 10
+    # Default student id when a tutoring request omits one.
+    tutor_default_student_id: str = "demo"
+    # Teaching answers need more room than QA answers (definitions + points +
+    # check question). Separate budget so /query stays fast.
+    tutor_max_new_tokens: int = 512
+    # Lower generation cap for beginner difficulty (1-2): prompt-level
+    # conciseness constraints do the real work; this bounds runaway output.
+    tutor_max_new_tokens_beginner: int = 320
+
     # --- LLM configuration (local-first, free) ---
     # provider: "transformers" (local HF model) or "mock" (offline tests)
     llm_provider: str = "transformers"
-    llm_model_name: str = "Qwen/Qwen2.5-0.5B-Instruct"
+    # Instruction-tuned model. 3B chosen for teaching quality; fits 6 GB VRAM
+    # only with quantization, so default device is CPU (fp32, ~12.4 GB RAM).
+    # Set LLM_DEVICE=cuda to try GPU first; the client falls back to CPU if
+    # CUDA is unavailable or the model cannot be placed on it.
+    llm_model_name: str = "Qwen/Qwen2.5-3B-Instruct"
+    # "auto": try CUDA 4-bit (NF4) when torch+CUDA+bitsandbytes are all
+    # available (3B fp32 does NOT fit 6 GB VRAM; 4-bit needs ~2-3 GB);
+    # otherwise fall back to CPU float32. Explicit "cuda"/"cpu" force the
+    # device (CPU fallback still applies if placement fails).
+    llm_device: str = "auto"
+    # "auto": bfloat16 on GPU with 4-bit quantization, float32 on CPU.
+    llm_torch_dtype: str = "auto"
+    # 4-bit quantization settings (bitsandbytes NF4) used when device=auto/cuda
+    # and CUDA is available. Double quantization + compute in bfloat16.
+    llm_load_in_4bit: bool = True
+    llm_4bit_quant_type: str = "nf4"
     llm_max_new_tokens: int = 256
 
     model_config = SettingsConfigDict(

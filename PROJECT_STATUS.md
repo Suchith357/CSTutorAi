@@ -160,3 +160,58 @@ uvicorn backend.app.main:app --reload
 .venv/Scripts/python.exe scripts/evaluate_retrieval.py
 python scripts/demo_query.py "What is a deadlock in operating systems?"
 ```
+
+---
+
+## Milestone: Tutor Engine + Adaptive Personalized Teaching (COMPLETED)
+
+**What was built** (all on top of the unchanged RAG + grounding foundation):
+
+- `backend/app/tutoring/` — Tutor Engine (`engine.py`), seven teaching modes
+  (`modes.py`: explain, simplify, example, hint, practice, viva, exam), structured
+  Pydantic responses (`schemas.py`), tutoring prompt builder with definition-vs-
+  mechanism discipline (`prompts.py`), rule-first answer evaluator
+  (`evaluator.py`), and an in-memory Student Model with a process-wide registry
+  (`student_model.py`).
+- API: `POST /tutor` (grounded, mode-aware, difficulty-adaptive tutoring turn),
+  `POST /tutor/evaluate` (evaluate student answer -> verdict + teaching feedback +
+  mastery update), `GET /tutor/progress/{student_id}`. `/health` and `/query`
+  unchanged.
+- Student model: per-topic mastery [0,1], transparent deltas (+0.10 correct /
+  −0.05 incorrect / 0 partial, hints tracked not scored), difficulty 1–5 from
+  explicit thresholds, recent-verdict history. In-memory only — resets on
+  restart, by design (no database in this milestone).
+- Grounding stays authoritative: the Tutor Engine calls the SAME
+  `evaluate_retrieval()` gate; weak/empty retrieval returns a safe refusal and
+  the LLM is never called (control-flow proven in tests with a spy LLM).
+- Deadlock quality constraint: the tutoring prompt forbids claiming that
+  satisfying/maintaining necessary conditions prevents a phenomenon, with the
+  mutual-exclusion error called out explicitly. A deterministic benchmark check
+  (`must_not_contain`) plus test assertions guard against regression of the
+  known Qwen failure mode.
+- Knowledge-base improvement discovered by the tutoring benchmark: "What is a
+  race condition?" scored 0.3363 (below threshold) and semaphores were diluted
+  inside a mixed chunk. Fixed in the corpus (added question-shaped phrasing;
+  split `semaphores.md` into a focused document) — race condition now 0.4217,
+  semaphore 0.6079. Index rebuilt: 16 documents, 44 chunks. The 0.42 threshold
+  was NOT changed; retrieval evaluation re-confirmed it (P 1.000, R 0.960,
+  F1 0.980, TP 24/FN 1/FP 0/TN 10).
+
+**Verification:** compileall clean; full suite 135 passed (40 new tutoring
+tests: 7 modes, mastery updates, difficulty adaptation, topic-from-metadata,
+spy-LLM grounding control-flow proofs, evaluator rules + LLM-judge fallback,
+schema validation, API endpoints, student isolation, /query compat); tutoring
+benchmark 15/15 grounding decisions correct with zero forbidden-phrase
+violations; live Qwen checks: deadlock explain (correct Coffman framing, no
+violations), incorrect->mastery 0.0 / difficulty 1, correct->mastery 0.1, weak
+question refused without an LLM call, /query intact.
+
+**Honest limitations:** in-memory student state (resets on restart); the 0.5B
+model can still make content errors — constraints reduce, not eliminate;
+benchmark coverage metric is a vocabulary proxy; tutoring correctness/teaching
+quality need human transcript review; no claim of zero hallucinations or
+perfect personalization.
+
+**Next milestones (unchanged scope):** expand the labeled evaluation sets;
+optional reranker for named-entity queries; then frontend/DB/Tutor-Engine
+persistence decisions remain deliberately out of scope until requested.

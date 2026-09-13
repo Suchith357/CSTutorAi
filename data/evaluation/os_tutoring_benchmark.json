@@ -1,0 +1,204 @@
+{
+  "schema_version": 1,
+  "description": "OSTutorAI tutoring benchmark. Deterministic, manually reviewable checks over the Tutor Engine's behavior on representative Operating Systems questions. This is NOT automated semantic grading: reference-point coverage is a rule-based proxy for content coverage, and phrase checks are deterministic sanity constraints. Human review of generated transcripts remains necessary.",
+  "grading_policy": {
+    "grounding": "The grounding gate (retrieval_min_score=0.42) decides grounded=true/false; compared against should_ground. This is a decision metric, not answer quality.",
+    "content_coverage": "When --llm is enabled, the generated explanation is scored with the same rule-based reference-point matcher used for student answers (backend.app.tutoring.evaluator). It checks vocabulary overlap with known corpus facts; it does NOT verify semantic correctness.",
+    "phrase_checks": "should_contain / must_not_contain are deterministic string checks on generated text. must_not_contain encodes the known Qwen2.5-0.5B failure mode on Coffman conditions (claiming that satisfying all four necessary conditions prevents deadlock).",
+    "manual_review": "The script prints full transcripts; instructional usefulness and teaching quality require human review and are intentionally not automated.",
+    "limitations": "35-question scale is engineering-grade. Vocabulary overlap overrates answers that parrot the corpus without understanding. LLM evaluation is not perfect and is never claimed to be."
+  },
+  "cases": [
+    {
+      "id": "tb_dead_001",
+      "question": "What is deadlock in operating systems?",
+      "topic": "deadlocks",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "a set of processes are permanently blocked",
+        "each process waits for a resource held by another process",
+        "the four necessary conditions are mutual exclusion, hold and wait, no preemption, and circular wait"
+      ],
+      "should_contain": ["mutual exclusion", "circular wait"],
+      "must_not_contain": ["ensure that all four", "satisfying all four", "all four conditions are met"]
+    },
+    {
+      "id": "tb_dead_002",
+      "question": "Explain deadlock prevention.",
+      "topic": "deadlocks",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "prevention eliminates at least one of the necessary conditions",
+        "prevention constrains how resources can be requested"
+      ],
+      "should_contain": ["condition"],
+      "must_not_contain": ["satisfying all four"]
+    },
+    {
+      "id": "tb_proc_001",
+      "question": "What is a process in an operating system?",
+      "topic": "processes",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "a program in execution",
+        "the process control block stores process state"
+      ],
+      "should_contain": ["execution"],
+      "must_not_contain": []
+    },
+    {
+      "id": "tb_proc_002",
+      "question": "What is context switching?",
+      "topic": "processes",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "the CPU switches from one process to another",
+        "the state of the old process is saved and the new process state is restored"
+      ],
+      "should_contain": ["state"],
+      "must_not_contain": []
+    },
+    {
+      "id": "tb_sched_001",
+      "question": "Explain Round Robin CPU scheduling.",
+      "topic": "cpu-scheduling",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "each process gets a small time quantum",
+        "the process is preempted and added to the tail of the ready queue when the quantum expires"
+      ],
+      "should_contain": ["quantum"],
+      "must_not_contain": []
+    },
+    {
+      "id": "tb_sync_001",
+      "question": "What is a semaphore?",
+      "topic": "synchronization",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "a semaphore is an integer variable accessed through atomic wait and signal operations",
+        "semaphores solve the critical section problem"
+      ],
+      "should_contain": ["wait", "signal"],
+      "must_not_contain": []
+    },
+    {
+      "id": "tb_sync_002",
+      "question": "What is a race condition?",
+      "topic": "synchronization",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "several processes access and manipulate shared data concurrently",
+        "the outcome depends on the order of access"
+      ],
+      "should_contain": ["shared"],
+      "must_not_contain": []
+    },
+    {
+      "id": "tb_mem_001",
+      "question": "What is paging in operating systems?",
+      "topic": "memory-management",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "physical memory is divided into fixed-sized frames",
+        "logical memory is divided into pages of the same size"
+      ],
+      "should_contain": ["page"],
+      "must_not_contain": []
+    },
+    {
+      "id": "tb_vmem_001",
+      "question": "Explain LRU page replacement.",
+      "topic": "virtual-memory",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "LRU replaces the page that has not been used for the longest time",
+        "LRU uses the recent past as an approximation of the near future"
+      ],
+      "should_contain": ["replace"],
+      "must_not_contain": []
+    },
+    {
+      "id": "tb_fs_001",
+      "question": "What is indexed file allocation?",
+      "topic": "file-systems",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "all disk pointers are brought together in an index block",
+        "the index block is used to find the blocks of a file"
+      ],
+      "should_contain": ["index"],
+      "must_not_contain": []
+    },
+    {
+      "id": "tb_io_001",
+      "question": "What is DMA in operating systems?",
+      "topic": "io-systems",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "direct memory access transfers a block of data directly between the device and memory",
+        "the CPU is interrupted only once per block instead of once per byte"
+      ],
+      "should_contain": ["memory"],
+      "must_not_contain": []
+    },
+    {
+      "id": "tb_ipc_001",
+      "question": "What is a pipe in interprocess communication?",
+      "topic": "ipc",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "a pipe is a one-way communication channel",
+        "data written into one end is read from the other end"
+      ],
+      "should_contain": ["communication"],
+      "must_not_contain": []
+    },
+    {
+      "id": "tb_sysc_001",
+      "question": "What is a system call and how does fork work?",
+      "topic": "system-calls",
+      "mode": "explain",
+      "should_ground": true,
+      "reference_points": [
+        "a system call is the interface between a running program and the operating system",
+        "fork creates a new process that is a copy of the calling process",
+        "the child gets a copy-on-write duplicate of the parent's memory"
+      ],
+      "should_contain": ["fork"],
+      "must_not_contain": []
+    },
+    {
+      "id": "tb_off_001",
+      "question": "Explain the difference between TCP and UDP.",
+      "topic": "non-os",
+      "mode": "explain",
+      "should_ground": false,
+      "reference_points": [],
+      "should_contain": [],
+      "must_not_contain": []
+    },
+    {
+      "id": "tb_off_002",
+      "question": "What is gradient descent in machine learning?",
+      "topic": "non-os",
+      "mode": "explain",
+      "should_ground": false,
+      "reference_points": [],
+      "should_contain": [],
+      "must_not_contain": []
+    }
+  ]
+}

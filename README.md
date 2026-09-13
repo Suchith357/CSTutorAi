@@ -126,3 +126,81 @@ F1 0.941 (TP 8, FN 1, FP 0, TN 10). The sweep's best-F1 value (0.30) accepts one
 question, so **0.42 is kept**. These numbers are an engineering baseline on the toy corpus and
 must be re-established after the curated OS knowledge base replaces it. Scores are cosine
 similarities, not probabilities or percentages.
+
+## Tutor Engine — "Don't just answer the student. Teach the student."
+
+The Tutor Engine (`backend/app/tutoring/`) turns the grounded QA pipeline into an
+interactive Operating Systems tutor. It reuses the existing Retriever and grounding
+gate unchanged — weak retrieval still blocks generation and returns the safe refusal.
+
+### Architecture
+
+```
+POST /tutor {question, mode, student_id}
+   -> Retriever (existing)
+   -> Grounding gate (existing, threshold unchanged)
+   -> [insufficient] safe tutoring refusal, LLM NOT called (grounded=false)
+   -> [sufficient]   topic from retrieval metadata
+                     difficulty from the in-memory student model
+                     mode-specific teaching prompt -> local Qwen
+                     structured TutorResponse + sources
+```
+
+### Teaching modes
+
+`explain`, `simplify`, `example`, `hint`, `practice`, `viva`, `exam` — one reusable
+engine with a per-mode strategy (instruction + populated response fields), not seven
+separate pipelines. PRACTICE/VIVA ask questions; HINT never gives the answer away;
+EXAM adds definition-vs-mechanism discipline.
+
+### Adaptive student model (in-memory, no database)
+
+Per student and topic: questions attempted/correct/incorrect, hints used, mastery in
+[0, 1] (start 0.0), recent verdicts. Transparent update rule: correct
+`+0.10` (`TUTOR_MASTERY_GAIN_CORRECT`), incorrect `-0.05`
+(`TUTOR_MASTERY_DROP_INCORRECT`), partially correct ±0, hints tracked but never
+scored. Difficulty 1–5 maps from mastery via explicit thresholds (0.25 / 0.45 /
+0.70 / 0.90); the target difficulty is injected into the tutoring prompt. Student
+models reset when the server restarts — they are a learning-session state, not
+records.
+
+### API
+
+| Endpoint | Purpose |
+|---|---|
+| `POST /tutor` | grounded tutoring turn in any mode with adaptive difficulty |
+| `POST /tutor/evaluate` | evaluate a student answer, update mastery, return teaching feedback |
+| `GET /tutor/progress/{student_id}` | topic mastery + recent performance |
+
+`GET /health` and `POST /query` are unchanged and backward compatible.
+
+### Answer evaluation
+
+Rule-based first (vocabulary overlap with reference points; deterministic,
+explainable), with an LLM judge consulted only for ambiguous cases; malformed LLM
+output falls back to the rule result. Feedback teaches what was missing instead of
+just saying "wrong". LLM evaluation is explicitly not perfect.
+
+### Tutoring benchmark
+
+`data/evaluation/os_tutoring_benchmark.json` + `scripts/evaluate_tutoring.py`
+(15 cases, 13 OS topics + 2 non-OS refusals) check: grounding decisions against
+labels, deterministic phrase constraints — including `must_not_contain` guards that
+encode the known Qwen Coffman-conditions confusion ("satisfying all four conditions
+prevents deadlock" is backwards) — and optional reference-point coverage. The script
+prints full transcripts for human review of correctness/usefulness/teaching
+quality, which are deliberately NOT automated.
+
+```bash
+.venv/Scripts/python.exe scripts/evaluate_tutoring.py          # mock LLM, fast
+.venv/Scripts/python.exe scripts/evaluate_tutoring.py --llm    # real Qwen generation
+```
+
+### Known limitations
+
+- Student models are in-memory only (by design, no database in scope).
+- The 0.5B model can still make content errors; prompt constraints and checks
+  reduce but do not eliminate them. No claim of zero hallucinations is made.
+- Reference-point coverage is a vocabulary-overlap proxy, not correctness.
+- The benchmark (15 cases) is a structured, human-reviewable baseline, not a
+  scientific evaluation.
